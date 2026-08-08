@@ -18,9 +18,9 @@ async function main() {
   // Run an initial discovery+test immediately
   await runDiscoveryJob();
 
-  // Hourly discovery of new proxies (at minute 0)
-  cron.schedule('0 * * * *', async () => {
-    console.log('[cron] Hourly discovery');
+  // Discovery of new proxies every 15 minutes
+  cron.schedule('*/15 * * * *', async () => {
+    console.log('[cron] Discovery run');
     await runDiscoveryJob();
   });
 
