@@ -1,0 +1,20 @@
+{
+  "name": "proxy-rotator",
+  "version": "1.0.0",
+  "description": "Auto-updated free proxy pool for VykshyParts crawlers",
+  "type": "module",
+  "main": "src/index.mjs",
+  "scripts": {
+    "start": "node src/index.mjs",
+    "test-proxies": "node src/tester.mjs",
+    "fetch": "node src/sources.mjs",
+    "commit": "node src/github.mjs"
+  },
+  "dependencies": {
+    "node-cron": "3.0.3",
+    "simple-git": "3.25.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

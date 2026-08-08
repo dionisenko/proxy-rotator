@@ -1,0 +1,31 @@
+services:
+  proxy-rotator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: proxy-rotator:local
+    container_name: proxy-rotator
+    restart: unless-stopped
+    environment:
+      GITHUB_TOKEN: ${GITHUB_TOKEN}
+      REPO_OWNER: ${REPO_OWNER:-dionisenko}
+      REPO_NAME: ${REPO_NAME:-proxy-rotator}
+      REPO_BRANCH: ${REPO_BRANCH:-main}
+      TEST_CONCURRENCY: ${TEST_CONCURRENCY:-30}
+      TEST_TIMEOUT_SEC: ${TEST_TIMEOUT_SEC:-15}
+      DAILY_RECHECK_AT: ${DAILY_RECHECK_AT:-03:00}
+      HOURLY_DISCOVERY_AT: ${HOURLY_DISCOVERY_AT:-0}
+      PROXY_BATCH_LIMIT: ${PROXY_BATCH_LIMIT:-500}
+      GITHUB_PUSH: ${GITHUB_PUSH:-1}
+    volumes:
+      - proxy_rotator_data:/app/data
+      - proxy_rotator_repo:/app/repo
+    networks:
+      - proxy-net
+
+volumes:
+  proxy_rotator_data:
+  proxy_rotator_repo:
+
+networks:
+  proxy-net:
