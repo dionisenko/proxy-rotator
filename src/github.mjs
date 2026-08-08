@@ -34,7 +34,15 @@ async function ensureRepo() {
   await mkdir(REPO_DIR, { recursive: true });
   if (!existsSync(join(REPO_DIR, '.git'))) {
     const git = simpleGit(REPO_DIR);
-    const url = `https://202813344:${GITHUB_TOKEN}@github.com/${REPO_OWNER}/${REPO_NAME}.git`;
+    // Use a credential store file so the PAT never appears in command logs/URLs
+    const credentialsFile = join(REPO_DIR, '.git-credentials');
+    await writeFile(
+      credentialsFile,
+      `https://202813344:${GITHUB_TOKEN}@github.com\n`,
+      'utf8'
+    );
+    await git.raw(['config', '--global', 'credential.helper', `store --file=${credentialsFile}`]);
+    const url = `https://github.com/${REPO_OWNER}/${REPO_NAME}.git`;
     await git.clone(url, REPO_DIR, ['--depth', '1', '--branch', BRANCH]);
   }
 }
