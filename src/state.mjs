@@ -1,7 +1,7 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
-const DATA_DIR = process.env.DATA_DIR || '/app/data';
+const DATA_DIR = process.env.DATA_DIR || './data';
 const PROXIES_FILE = join(DATA_DIR, 'proxies.json');
 const STATE_FILE = join(DATA_DIR, 'state.json');
 

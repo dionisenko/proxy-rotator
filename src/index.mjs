@@ -4,6 +4,29 @@ import { loadState, saveState, mergeResults, buildPublicList, loadPublicList, sa
 import { updateRepoProxies, commitProxies } from './github.mjs';
 import cron from 'node-cron';
 
+// HTTP server for serving proxy list
+import express from 'express';
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.get('/proxies', async (req, res) => {
+  try {
+    const list = await loadPublicList();
+    res.json(list);
+  } catch (e) {
+    console.error('[proxy-rotator] /proxies error', e);
+    res.status(500).json({ error: 'internal error' });
+  }
+});
+
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+const server = app.listen(PORT, () => {
+  console.log(`[proxy-rotator] HTTP server listening on port ${PORT}`);
+});
+
 const CONCURRENCY = Number(process.env.TEST_CONCURRENCY || 30);
 const TEST_TIMEOUT = Number(process.env.TEST_TIMEOUT_SEC || 15);
 const PROXY_BATCH_LIMIT = Number(process.env.PROXY_BATCH_LIMIT || 500);
@@ -75,7 +98,6 @@ async function runRecheckJob() {
 async function testAndStore(urls, { recheck = false } = {}) {
   const state = await loadState();
   const items = urls.map(url => ({ url: normalizeUrl(url) }));
-
   const results = await runPool(items, CONCURRENCY, async ({ url }) => {
     const targetResults = await testProxyAllTargets(url);
     const workingTargets = targetResults.filter(r => r.ok).map(r => r.target);

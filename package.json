@@ -11,6 +11,7 @@
     "commit": "node src/github.mjs"
   },
   "dependencies": {
+    "express": "^5.2.1",
     "node-cron": "3.0.3",
     "simple-git": "3.25.0"
   },
