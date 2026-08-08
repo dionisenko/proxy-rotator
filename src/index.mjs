@@ -6,10 +6,11 @@ import cron from 'node-cron';
 
 const CONCURRENCY = Number(process.env.TEST_CONCURRENCY || 30);
 const TEST_TIMEOUT = Number(process.env.TEST_TIMEOUT_SEC || 15);
-const DAILY_RECHECK_AT = process.env.DAILY_RECHECK_AT || '03:00';
-const HOURLY_DISCOVERY_AT = process.env.HOURLY_DISCOVERY_AT || '0'; // every hour at minute 0
 const PROXY_BATCH_LIMIT = Number(process.env.PROXY_BATCH_LIMIT || 500);
 const GITHUB_PUSH = process.env.GITHUB_PUSH !== '0';
+
+let refreshPromise = null;
+let jobLock = false;
 
 async function main() {
   console.log('[proxy-rotator] Starting service');
@@ -17,41 +18,58 @@ async function main() {
   // Run an initial discovery+test immediately
   await runDiscoveryJob();
 
-  // Hourly discovery of new proxies
-  cron.schedule(`0 ${HOURLY_DISCOVERY_AT} * * * *`, async () => {
+  // Hourly discovery of new proxies (at minute 0)
+  cron.schedule('0 * * * *', async () => {
     console.log('[cron] Hourly discovery');
     await runDiscoveryJob();
   });
 
-  // Daily recheck of all known proxies
-  const [hour, minute] = DAILY_RECHECK_AT.split(':');
-  cron.schedule(`${minute} ${hour} * * *`, async () => {
+  // Daily recheck of all known proxies at 03:00
+  cron.schedule('0 3 * * *', async () => {
     console.log('[cron] Daily recheck');
     await runRecheckJob();
   });
 }
 
 async function runDiscoveryJob() {
-  const start = Date.now();
-  console.log('[job] Discovering proxies...');
-  let candidates = await fetchAllSources();
-  console.log(`[job] ${candidates.length} raw candidates`);
-  candidates = candidates.slice(0, PROXY_BATCH_LIMIT);
-  await testAndStore(candidates);
-  console.log(`[job] Discovery finished in ${Date.now() - start}ms`);
+  if (jobLock) {
+    console.log('[job] Discovery already running, skipping');
+    return;
+  }
+  jobLock = true;
+  try {
+    const start = Date.now();
+    console.log('[job] Discovering proxies...');
+    let candidates = await fetchAllSources();
+    console.log(`[job] ${candidates.length} raw candidates`);
+    candidates = candidates.slice(0, PROXY_BATCH_LIMIT);
+    await testAndStore(candidates);
+    console.log(`[job] Discovery finished in ${Date.now() - start}ms`);
+  } finally {
+    jobLock = false;
+  }
 }
 
 async function runRecheckJob() {
-  const start = Date.now();
-  const state = await loadState();
-  const knownUrls = Object.keys(state.known || {});
-  console.log(`[job] Rechecking ${knownUrls.length} known proxies`);
-  if (knownUrls.length === 0) {
-    console.log('[job] No known proxies, running discovery instead');
-    return runDiscoveryJob();
+  if (jobLock) {
+    console.log('[job] Another job is running, skipping recheck');
+    return;
   }
-  await testAndStore(knownUrls, { recheck: true });
-  console.log(`[job] Recheck finished in ${Date.now() - start}ms`);
+  jobLock = true;
+  try {
+    const start = Date.now();
+    const state = await loadState();
+    const knownUrls = Object.keys(state.known || {});
+    console.log(`[job] Rechecking ${knownUrls.length} known proxies`);
+    if (knownUrls.length === 0) {
+      console.log('[job] No known proxies, running discovery instead');
+      return runDiscoveryJob();
+    }
+    await testAndStore(knownUrls, { recheck: true });
+    console.log(`[job] Recheck finished in ${Date.now() - start}ms`);
+  } finally {
+    jobLock = false;
+  }
 }
 
 async function testAndStore(urls, { recheck = false } = {}) {
