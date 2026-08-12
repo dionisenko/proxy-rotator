@@ -1,5 +1,5 @@
 import { simpleGit } from 'simple-git';
-import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, rm, readdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -33,7 +33,16 @@ export async function commitProxies() {
 async function ensureRepo() {
   await mkdir(REPO_DIR, { recursive: true });
   if (!existsSync(join(REPO_DIR, '.git'))) {
+    // If the directory already contains non-git files (e.g. stale proxies.json),
+    // git clone refuses to overwrite. Remove contents and clone fresh.
     const git = simpleGit(REPO_DIR);
+    const entries = await readdir(REPO_DIR).catch(() => []);
+    if (entries.length > 0) {
+      console.log(`[github] Cleaning stale repo dir ${REPO_DIR} before clone`);
+      for (const entry of entries) {
+        await rm(join(REPO_DIR, entry), { recursive: true, force: true });
+      }
+    }
     // Use a credential store file so the PAT never appears in command logs/URLs
     const credentialsFile = join(REPO_DIR, '.git-credentials');
     await writeFile(
