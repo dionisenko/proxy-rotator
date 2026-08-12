@@ -22,6 +22,8 @@ services:
       - proxy_rotator_repo:/app/repo
     networks:
       - proxy-net
+    ports:
+      - "3001:3000"
 
 volumes:
   proxy_rotator_data:

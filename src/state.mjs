@@ -77,24 +77,44 @@ export function mergeResults(state, results, maxAgeDays = 2) {
   return state;
 }
 
-export function buildPublicList(state, minSuccessRate = 0.3, maxFailures = 4) {
+function parseProxyUrl(url = '') {
+  try {
+    const u = new URL(url);
+    return {
+      protocol: u.protocol.replace(':', ''),
+      ip: u.hostname,
+      port: Number(u.port) || null,
+    };
+  } catch {
+    return { protocol: null, ip: null, port: null };
+  }
+}
+
+export function buildPublicList(state, minSuccessRate = 0.0, maxFailures = Infinity) {
   const now = new Date().toISOString();
   const proxies = Object.values(state.known)
-    .filter(e => {
-      const total = e.successes + e.failures;
-      if (total === 0) return false;
-      if (e.failures >= maxFailures && e.successes === 0) return false;
-      const rate = e.successes / total;
-      return rate >= minSuccessRate && e.workingTargets.length > 0;
+    .filter(e => e.lastTested)
+    .map(e => {
+      const parsed = parseProxyUrl(e.url);
+      return {
+        url: e.url,
+        ip: parsed.ip,
+        port: parsed.port,
+        protocol: parsed.protocol,
+        lastTested: e.lastTested,
+        successes: e.successes,
+        failures: e.failures,
+        workingTargets: e.workingTargets.slice(),
+        isWorking: e.workingTargets.length > 0,
+        averageLatencyMs: e.latencyCount ? Math.round(e.latencyTotalMs / e.latencyCount) : null,
+      };
     })
-    .map(e => ({
-      url: e.url,
-      lastTested: e.lastTested,
-      successes: e.successes,
-      failures: e.failures,
-      workingTargets: e.workingTargets.slice(),
-      averageLatencyMs: e.latencyCount ? Math.round(e.latencyTotalMs / e.latencyCount) : null,
-    }))
-    .sort((a, b) => (b.successes / (b.successes + b.failures + 1)) - (a.successes / (a.successes + a.failures + 1)));
-  return { updatedAt: now, proxies };
+    .sort((a, b) => {
+      // Working proxies first, then by success rate
+      const aWorking = a.workingTargets.length > 0 ? 1 : 0;
+      const bWorking = b.workingTargets.length > 0 ? 1 : 0;
+      if (aWorking !== bWorking) return bWorking - aWorking;
+      return (b.successes / (b.successes + b.failures + 1)) - (a.successes / (a.successes + a.failures + 1));
+    });
+  return { updatedAt: now, count: proxies.length, proxies };
 }
