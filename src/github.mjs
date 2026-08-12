@@ -1,5 +1,5 @@
 import { simpleGit } from 'simple-git';
-import { readFile, writeFile, mkdir, rm, readdir } from 'node:fs/promises';
+import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -32,28 +32,26 @@ export async function commitProxies() {
 
 async function ensureRepo() {
   await mkdir(REPO_DIR, { recursive: true });
+  const git = simpleGit(REPO_DIR);
+
+  // Use a credential store file outside the repo so the PAT never appears in command logs/URLs
+  const credentialsFile = '/tmp/.proxy-rotator-git-credentials';
+  await writeFile(
+    credentialsFile,
+    `https://202813344:${GITHUB_TOKEN}@github.com\n`,
+    'utf8'
+  );
+  await git.raw(['config', '--global', 'credential.helper', `store --file=${credentialsFile}`]);
+
   if (!existsSync(join(REPO_DIR, '.git'))) {
-    // If the directory already contains non-git files (e.g. stale proxies.json),
-    // git clone refuses to overwrite. Remove contents and clone fresh.
-    const git = simpleGit(REPO_DIR);
-    const entries = await readdir(REPO_DIR).catch(() => []);
-    if (entries.length > 0) {
-      console.log(`[github] Cleaning stale repo dir ${REPO_DIR} before clone`);
-      for (const entry of entries) {
-        await rm(join(REPO_DIR, entry), { recursive: true, force: true });
-      }
-    }
-    // Use a credential store file so the PAT never appears in command logs/URLs
-    const credentialsFile = join(REPO_DIR, '.git-credentials');
-    await writeFile(
-      credentialsFile,
-      `https://202813344:${GITHUB_TOKEN}@github.com\n`,
-      'utf8'
-    );
-    await git.raw(['config', '--global', 'credential.helper', `store --file=${credentialsFile}`]);
-    const url = `https://github.com/${REPO_OWNER}/${REPO_NAME}.git`;
-    await git.clone(url, REPO_DIR, ['--depth', '1', '--branch', BRANCH]);
+    console.log(`[github] Initialising git repo in ${REPO_DIR}`);
+    await git.init();
+    await git.addRemote('origin', `https://github.com/${REPO_OWNER}/${REPO_NAME}.git`);
   }
+
+  // Force-fetch and checkout the target branch, allowing non-empty directories.
+  await git.fetch('origin', BRANCH, ['--depth', '1']);
+  await git.raw(['checkout', '-f', '-B', BRANCH, `origin/${BRANCH}`]);
 }
 
 export async function updateRepoProxies(publicList) {
