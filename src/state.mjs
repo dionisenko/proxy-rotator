@@ -92,7 +92,7 @@ function parseProxyUrl(url = '') {
 
 export function buildPublicList(state, minSuccessRate = 0.0, maxFailures = Infinity) {
   const now = new Date().toISOString();
-  const proxies = Object.values(state.known)
+  const mapped = Object.values(state.known)
     .filter(e => e.lastTested)
     .map(e => {
       const parsed = parseProxyUrl(e.url);
@@ -116,5 +116,6 @@ export function buildPublicList(state, minSuccessRate = 0.0, maxFailures = Infin
       if (aWorking !== bWorking) return bWorking - aWorking;
       return (b.successes / (b.successes + b.failures + 1)) - (a.successes / (a.successes + a.failures + 1));
     });
-  return { updatedAt: now, count: proxies.length, proxies };
+  const workingCount = mapped.filter(p => p.isWorking).length;
+  return { updatedAt: now, count: mapped.length, workingCount, proxies: mapped };
 }

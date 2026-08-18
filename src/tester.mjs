@@ -80,8 +80,14 @@ export function testProxy(proxyUrl, target, timeoutSec = 15) {
 
 function extractBody(full) {
   const sep = '\r\n\r\n';
-  const idx = full.indexOf(sep);
-  return idx >= 0 ? full.slice(idx + sep.length) : full;
+  let idx = full.lastIndexOf(sep);
+  if (idx < 0) {
+    const altSep = '\n\n';
+    idx = full.lastIndexOf(altSep);
+    if (idx >= 0) return full.slice(idx + altSep.length).trim();
+    return full;
+  }
+  return full.slice(idx + sep.length).trim();
 }
 
 /**

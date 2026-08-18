@@ -124,7 +124,8 @@ async function testAndStore(urls, { recheck = false } = {}) {
     await commitProxies();
   }
 
-  console.log(`[job] Public list: ${publicList.proxies.length} working proxies`);
+  const workingCount = publicList.proxies.filter(p => p.workingTargets && p.workingTargets.length > 0).length;
+  console.log(`[job] Public list: ${publicList.proxies.length} total proxies (${workingCount} working)`);
   return publicList;
 }
 
